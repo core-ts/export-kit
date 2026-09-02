@@ -96,6 +96,283 @@ String/data
 
 This makes the formatting functions useful independently of the file-writing layer.
 
+## Types
+
+### `Attribute`
+
+```ts
+interface Attribute {
+  getString?: (v: any) => string
+  length?: number
+}
+
+interface Attributes {
+  [key: string]: Attribute
+}
+```
+
+### `FixedLengthAttribute`
+
+```ts
+interface FixedLengthAttribute {
+  getString?: (v: any) => string
+  length: number
+}
+
+interface FixedLengthAttributes {
+  [key: string]: FixedLengthAttribute
+}
+```
+
+
+### Architecture
+
+```text
+                    Attributes
+                         │
+         ┌───────────────┴───────────────┐
+         │                               │
+         ▼                               ▼
+   CSVFormatter                FixedLengthFormatter
+         │                               │
+         └───────────────┬───────────────┘
+                         │
+   Formatted String (to CSV or fixed-length format)
+                         │
+                 Stream File Writer 
+                         │
+                         ▼
+                    Output File
+```
+
+The formatter is responsible only for converting objects into text.
+
+The writer is responsible only for writing text.
+
+This separation keeps export logic independent from file I/O.
+
+## CSV Formatting
+
+CSV output is controlled by an attribute schema. The schema also determines the column order.
+
+```ts
+import { Attributes, toCSV } from "export-kit"
+
+const schema: Attributes = {
+  id: {},
+  name: {},
+  active: {}
+}
+
+const value = {
+  id: 1001,
+  name: "John",
+  active: true
+}
+
+const csv = toCSV(value, ",", schema)
+
+console.log(csv)
+// 1001,John,true
+```
+
+Generated output
+
+```text
+1001,John,true
+```
+
+### Custom Value Conversion
+
+Each attribute can define a `getString` function.
+
+```ts
+import { Attributes, dateToString, toCSV } from "export-kit"
+
+const schema: Attributes = {
+  id: {},
+  name: {},
+  createdAt: {
+    getString: (value: Date) => dateToString(value, "-")
+  }
+}
+
+const value = {
+  id: 1001,
+  name: "John",
+  createdAt: new Date(2026, 7, 18)
+}
+
+const csv = toCSV(value, ",", schema)
+
+console.log(csv)
+// 1001,John,2026-08-18
+```
+
+Generated output
+
+```text
+1001,John,2026-08-18
+```
+
+### CSV Escaping
+
+String values are automatically escaped when they contain:
+
+* The configured separator
+* A double quote
+* A carriage return
+* A newline
+
+For example:
+
+```ts
+const schema: Attributes = {
+  name: {}
+}
+
+const value = {
+  name: 'John "Smith"'
+}
+
+console.log(toCSV(value, ",", schema))
+// "John ""Smith"""
+```
+
+Generated output
+
+```text
+"John ""Smith"""
+```
+
+### `CSVFormatter`
+
+`CSVFormatter` is useful when the same schema is used repeatedly.
+
+```ts
+import { Attributes, CSVFormatter } from "export-kit"
+
+const schema: Attributes = {
+  id: {},
+  name: {}
+}
+
+const formatter = new CSVFormatter(schema, ",")
+
+console.log(formatter.format({
+  id: 1,
+  name: "Alice"
+}))
+
+console.log(formatter.format({
+  id: 2,
+  name: "Bob"
+}))
+```
+
+By default, each formatted record ends with `\n`.
+
+A custom record terminator can be supplied:
+
+```ts
+const schema: Attributes = {
+  id: {},
+  name: {}
+}
+
+const formatter = new CSVFormatter(
+  schema,
+  ",",
+  "\r\n"
+)
+```
+
+## Fixed-Length Records
+
+The library can generate fixed-length records using a schema that defines the length of every field.
+
+```ts
+import { FixedLengthAttributes, toFixedLength } from "export-kit"
+
+const schema: FixedLengthAttributes = {
+  id: {
+    length: 5
+  },
+  name: {
+    length: 10
+  }
+}
+
+const value = {
+  id: "123",
+  name: "Alice"
+}
+
+const result = toFixedLength(
+  value,
+  schema,
+  " "
+)
+
+console.log(result)
+// "  123     Alice"
+```
+
+Fields are left-padded using the configured padding character.
+
+### Custom Conversion
+
+As with CSV formatting, attributes can provide `getString`.
+
+```ts
+const schema: FixedLengthAttributes = {
+  id: {
+    length: 8,
+    getString: (value: number) => value.toString()
+  },
+  name: {
+    length: 20
+  }
+}
+```
+
+### `FixedLengthFormatter`
+
+For repeated formatting with the same schema:
+
+```ts
+import { FixedLengthAttributes, FixedLengthFormatter } from "export-kit"
+
+const schema: FixedLengthAttributes = {
+  id: { length: 8 },
+  name: { length: 20 }
+}
+
+const formatter = new FixedLengthFormatter(schema)
+
+const record = formatter.format({
+  id: 123,
+  name: "Alice"
+})
+```
+
+The default padding character is a space and the default record terminator is `\n`.
+
+Custom values can be supplied:
+
+```ts
+const schema: FixedLengthAttributes = {
+  id: { length: 8 },
+  name: { length: 20 }
+}
+
+const formatter = new FixedLengthFormatter(
+  schema,
+  "0",
+  "\r\n"
+)
+```
+
 ## File Writing
 
 ### `createWriteStream`
@@ -171,252 +448,6 @@ const writer = new LogWriter(
 writer.write("one")
 writer.write("two")
 ```
-
-
-## Types
-
-### `Attribute`
-
-```ts
-interface Attribute {
-  getString?: (v: any) => string
-  length?: number
-}
-```
-
-### `FixedLengthAttribute`
-
-```ts
-interface FixedLengthAttribute {
-  getString?: (v: any) => string
-  length: number
-}
-```
-
-### `Attributes`
-
-```ts
-interface Attributes {
-  [key: string]: Attribute
-}
-```
-
-### `FixedLengthAttributes`
-
-```ts
-interface FixedLengthAttributes {
-  [key: string]: FixedLengthAttribute
-}
-```
-
-### `StreamOptions`
-
-A stream options interface matching the supported Node.js write stream configuration.
-
-## CSV Formatting
-
-CSV output is controlled by an attribute schema. The schema also determines the column order.
-
-```ts
-import { toCSV } from "export-kit"
-
-const schema = {
-  id: {},
-  name: {},
-  active: {}
-}
-
-const value = {
-  id: 1001,
-  name: "John",
-  active: true
-}
-
-const csv = toCSV(value, ",", schema)
-
-console.log(csv)
-// 1001,John,true
-```
-
-### Custom Value Conversion
-
-Each attribute can define a `getString` function.
-
-```ts
-import {
-  dateToString,
-  toCSV
-} from "export-kit"
-
-const schema = {
-  id: {},
-  name: {},
-  createdAt: {
-    getString: (value: Date) => dateToString(value, "-")
-  }
-}
-
-const value = {
-  id: 1001,
-  name: "John",
-  createdAt: new Date(2026, 7, 18)
-}
-
-const csv = toCSV(value, ",", schema)
-
-console.log(csv)
-// 1001,John,2026-08-18
-```
-
-### CSV Escaping
-
-String values are automatically escaped when they contain:
-
-* The configured separator
-* A double quote
-* A carriage return
-* A newline
-
-For example:
-
-```ts
-const schema = {
-  name: {}
-}
-
-const value = {
-  name: 'John "Smith"'
-}
-
-console.log(toCSV(value, ",", schema))
-// "John ""Smith"""
-```
-
-### `CSVFormatter`
-
-`CSVFormatter` is useful when the same schema is used repeatedly.
-
-```ts
-import { CSVFormatter } from "export-kit"
-
-const formatter = new CSVFormatter(
-  {
-    id: {},
-    name: {}
-  },
-  ","
-)
-
-console.log(formatter.format({
-  id: 1,
-  name: "Alice"
-}))
-
-console.log(formatter.format({
-  id: 2,
-  name: "Bob"
-}))
-```
-
-By default, each formatted record ends with `\n`.
-
-A custom record terminator can be supplied:
-
-```ts
-const formatter = new CSVFormatter(
-  {
-    id: {},
-    name: {}
-  },
-  ",",
-  "\r\n"
-)
-```
-
-## Fixed-Length Records
-
-The library can generate fixed-length records using a schema that defines the length of every field.
-
-```ts
-import { toFixedLength } from "export-kit"
-
-const schema = {
-  id: {
-    length: 5
-  },
-  name: {
-    length: 10
-  }
-}
-
-const value = {
-  id: "123",
-  name: "Alice"
-}
-
-const result = toFixedLength(
-  value,
-  schema,
-  " "
-)
-
-console.log(result)
-// "  123     Alice"
-```
-
-Fields are left-padded using the configured padding character.
-
-### Custom Conversion
-
-As with CSV formatting, attributes can provide `getString`.
-
-```ts
-const schema = {
-  id: {
-    length: 8,
-    getString: (value: number) => value.toString()
-  },
-  name: {
-    length: 20
-  }
-}
-```
-
-### `FixedLengthFormatter`
-
-For repeated formatting with the same schema:
-
-```ts
-import { FixedLengthFormatter } from "export-kit"
-
-const formatter = new FixedLengthFormatter(
-  {
-    id: { length: 8 },
-    name: { length: 20 }
-  }
-)
-
-const record = formatter.format({
-  id: 123,
-  name: "Alice"
-})
-```
-
-The default padding character is a space and the default record terminator is `\n`.
-
-Custom values can be supplied:
-
-```ts
-const formatter = new FixedLengthFormatter(
-  {
-    id: { length: 8 },
-    name: { length: 20 }
-  },
-  "0",
-  "\r\n"
-)
-```
-
 
 ## Date Utilities
 
@@ -696,34 +727,6 @@ Suitable for:
 - Government systems
 - Legacy integrations
 - Batch interfaces
-
----
-
-# Architecture
-
-```text
-                    Attributes
-                         │
-         ┌───────────────┴───────────────┐
-         │                               │
-         ▼                               ▼
-   CSVFormatter                FixedLengthFormatter
-         │                               │
-         └───────────────┬───────────────┘
-                         │
-   Formatted String (to CSV or fixed-length format)
-                         │
-                 Stream File Writer 
-                         │
-                         ▼
-                    Output File
-```
-
-The formatter is responsible only for converting objects into text.
-
-The writer is responsible only for writing text.
-
-This separation keeps export logic independent from file I/O.
 
 ---
 
