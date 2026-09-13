@@ -25,37 +25,27 @@ CSV Formatter    Fixed Length Formatter     FileWriter          LogWriter
 
 ## Features
 
-* Recursive directory creation
-* File and log stream writers
-* Custom value conversion through `getString`
-* Configurable CSV serialization
-* Fixed-length record serialization
-* Reusable CSV and fixed-length formatter classes
-* Date formatting with optional separators
-* Time formatting with optional separators
-* Date arithmetic with `addDays`
+* Format objects as CSV
+  * Properly escape CSV values containing separators, quotes, or line breaks
+  * Customize field formatting with `getString`
+  * Reusable `CSVFormatter`
+* Format objects as fixed-length records
+  * Customize field formatting with `getString`
+  * Reusable `FixedLengthFormatter`
+* Write text to files using Node.js streams
+  * Automatically create output directories
+  * Append to files by default
+  * Keep file-writing and formatting concerns separate
+* Generate date and time strings for file names and batch processing
+  * Date formatting with optional separators
+  * Time formatting with optional separators
+  * Date arithmetic with `addDays`
 * Minimal dependencies and lightweight implementation
-
-old:
-- Date/time formatting
-- Filename prefix generation
-- File writing
-- CSV schema-based serialization
-- Fixed-length serialization
-- Custom value conversion through `getString`
-- Formatting classes implementing a common `format()` shape
-- Zero runtime dependencies
 
 ## Installation
 
 ```bash
 npm install export-kit
-```
-
-or
-
-```bash
-yarn add export-kit
 ```
 
 ## Design
@@ -109,31 +99,42 @@ The default stream options append to the file using UTF-8 encoding:
 }
 ```
 
-Custom stream options can be provided.
+Custom stream options can be provided:
+
+```ts
+const writer = createWriteStream(
+  "./output",
+  "users.csv",
+  {
+    flags: "w",
+    encoding: "utf-8"
+  }
+)
+```
 
 ### `FileWriter`
 
 `FileWriter` is a small wrapper around a `WriteStream`.
 
 ```ts
-import { FileWriter, createWriteStream } from "export-kit"
+import { createFileWriter } from "export-kit"
 
-const writer = new FileWriter(
-  createWriteStream("./output", "data.txt")
-)
+const writer = createFileWriter("./output", "data.txt")
 
-writer.write("hello\n")
+writer.write("Hello\n")
 writer.end()
 ```
 
 ### `LogWriter`
 
-`LogWriter` appends a configurable suffix to every write. The default suffix is a newline.
+`LogWriter` writes a string and automatically appends a suffix to every record.
+
+The default suffix is `\n`.
 
 ```ts
 import { LogWriter } from "export-kit"
 
-const writer = new LogWriter("./logs", "application.log")
+const writer = createLogWriter("./output", "application.log")
 
 writer.write("Application started")
 writer.write("Application stopped")
@@ -150,15 +151,15 @@ Application stopped
 A custom suffix can be supplied:
 
 ```ts
-const writer = new LogWriter(
+const writer = createLogWriter(
   "./output",
   "data.txt",
   undefined,
-  "|"
+  "\r\n"
 )
 
-writer.write("one")
-writer.write("two")
+writer.write("Application started")
+writer.write("Application stopped")
 ```
 
 ---
@@ -221,38 +222,40 @@ The writer is responsible only for writing text.
 
 This separation keeps export logic independent from file I/O.
 
+---
+
 ## CSV Formatting
 
+### `toCSV`
 CSV output is controlled by an attribute schema. The schema also determines the column order.
 
 ```ts
-import { Attributes, toCSV } from "export-kit"
+import { toCSV } from "export-kit"
 
-const schema: Attributes = {
+const schema = {
   id: {},
   name: {},
-  active: {}
+  email: {}
 }
 
-const value = {
-  id: 1001,
+const user = {
+  id: 101,
   name: "John",
-  active: true
+  email: "john@example.com"
 }
 
-const csv = toCSV(value, ",", schema)
+const result = toCSV(user, ",", schema)
 
-console.log(csv)
-// 1001,John,true
+console.log(result)
 ```
 
-Generated output
+Output:
 
 ```text
-1001,John,true
+101,John,john@example.com
 ```
 
-### Custom Value Conversion
+### Custom Value Formatting
 
 Each attribute can define a `getString` function.
 
@@ -262,57 +265,81 @@ import { Attributes, dateToString, toCSV } from "export-kit"
 const schema: Attributes = {
   id: {},
   name: {},
-  createdAt: {
-    getString: (value: Date) => dateToString(value, "-")
+  birthday: {
+    getString: (value: Date) =>
+      value.toISOString().substring(0, 10)
   }
 }
 
-const value = {
-  id: 1001,
+const user = {
+  id: 101,
   name: "John",
-  createdAt: new Date(2026, 7, 18)
+  birthday: new Date(2006, 8, 18)
 }
 
-const csv = toCSV(value, ",", schema)
+const csv = toCSV(user, ",", schema)
 
 console.log(csv)
-// 1001,John,2026-08-18
 ```
 
-Generated output
+Output:
 
 ```text
-1001,John,2026-08-18
+101,John,2026-08-18
 ```
 
 ### CSV Escaping
 
-String values are automatically escaped when they contain:
+`escapeCSV` automatically quotes values when they contain:
 
-* The configured separator
-* A double quote
-* A carriage return
-* A newline
+* the separator
+* double quotes
+* carriage returns
+* line breaks
 
-For example:
+Double quotes are escaped according to CSV rules.
 
 ```ts
-const schema: Attributes = {
-  name: {}
-}
+import { escapeCSV } from "export-kit"
 
-const value = {
-  name: 'John "Smith"'
-}
-
-console.log(toCSV(value, ",", schema))
-// "John ""Smith"""
+escapeCSV('John "Smith"', ",")
 ```
 
-Generated output
+Result:
 
 ```text
 "John ""Smith"""
+```
+
+Another example:
+
+```ts
+import { Attributes, dateToString, toCSV } from "export-kit"
+
+const schema: Attributes = {
+  id: {},
+  name: {},
+  birthday: {
+    getString: (value: Date) =>
+      value.toISOString().substring(0, 10)
+  }
+}
+
+const user = {
+  id: 100,
+  name: 'John "Smith"',
+  birthday: new Date(2006, 8, 18)
+}
+
+const csv = toCSV(user, ",", schema)
+
+console.log(csv)
+```
+
+Output:
+
+```text
+101,"John ""Smith""",2026-08-18
 ```
 
 ### `CSVFormatter`
@@ -322,22 +349,18 @@ Generated output
 ```ts
 import { Attributes, CSVFormatter } from "export-kit"
 
-const schema: Attributes = {
+const schema = {
   id: {},
   name: {}
 }
 
+const user01 = { id: 101, name: "John" }
+const user02 = { id: 102, name: "Bob" }
+
 const formatter = new CSVFormatter(schema, ",")
 
-console.log(formatter.format({
-  id: 1,
-  name: "Alice"
-}))
-
-console.log(formatter.format({
-  id: 2,
-  name: "Bob"
-}))
+console.log(formatter.format(user01))
+console.log(formatter.format(user02))
 ```
 
 By default, each formatted record ends with `\n`.
@@ -357,53 +380,126 @@ const formatter = new CSVFormatter(
 )
 ```
 
-## Fixed-Length Records
+### `CSVFormatter` combines with `FileWriter`
+
+```ts
+import { Attributes, createFileWriter, CSVFormatter } from "export-kit"
+
+const schema = {
+  id: {},
+  name: {}
+}
+
+const user01 = { id: 101, name: "John" }
+const user02 = { id: 102, name: "Bob" }
+
+const formatter = new CSVFormatter(schema, ",")
+
+const writer = createFileWriter("./output", "data.txt")
+
+writer.write(formatter.format(user01))
+writer.write(formatter.format(user02))
+
+writer.end()
+```
+
+Output:
+
+```
+101,John
+102,Bob
+```
+
+## Fixed-Length Formatting
 
 The library can generate fixed-length records using a schema that defines the length of every field.
+
+## `toFixedLength`
 
 ```ts
 import { FixedLengthAttributes, toFixedLength } from "export-kit"
 
 const schema: FixedLengthAttributes = {
-  id: {
-    length: 5
-  },
-  name: {
-    length: 10
-  }
+  id: { length: 5 },
+  name: { length: 10 }
 }
 
-const value = {
-  id: "123",
-  name: "Alice"
+const user = {
+  id: 101,
+  name: "John"
 }
 
-const result = toFixedLength(
-  value,
-  schema,
-  " "
-)
+const result = toFixedLength(user, schema, " ")
 
 console.log(result)
-// "  123     Alice"
 ```
 
+Output:
+```
+  101      John
+```
 Fields are left-padded using the configured padding character.
 
-### Custom Conversion
+### Padding
+
+The `pad()` utility performs left padding:
+
+```ts
+import { pad } from "export-kit"
+
+pad("123", 5, "0")
+// "00123"
+
+pad("ABC", 6, " ")
+// "   ABC"
+```
+
+When a value is longer than the requested length, it is truncated:
+
+```ts
+pad("ABCDEFG", 5, " ")
+// "ABCDE"
+```
+
+Therefore, field lengths should be chosen carefully when generating files consumed by external systems.
+
+### Custom field formatting
 
 As with CSV formatting, attributes can provide `getString`.
 
 ```ts
+import { FixedLengthAttributes, dateToString, toFixedLength } from "export-kit"
+
 const schema: FixedLengthAttributes = {
   id: {
-    length: 8,
+    length: 5
     getString: (value: number) => value.toString()
   },
   name: {
-    length: 20
+    length: 10
+  }
+  birthday: {
+    length: 10,
+    getString: (value: Date) =>
+      value.toISOString().substring(0, 10)
   }
 }
+
+const user = {
+  id: 101,
+  name: "John",
+  birthday: new Date(2006, 8, 18)
+}
+
+const result = toFixedLength(user, schema, " ")
+
+console.log(result)
+```
+
+Output:
+
+```
+  101      John2006-08-18
 ```
 
 ### `FixedLengthFormatter`
@@ -414,16 +510,17 @@ For repeated formatting with the same schema:
 import { FixedLengthAttributes, FixedLengthFormatter } from "export-kit"
 
 const schema: FixedLengthAttributes = {
-  id: { length: 8 },
-  name: { length: 20 }
+  id: { length: 5 },
+  name: { length: 10 }
 }
+
+const user01 = { id: 101, name: "John" }
+const user02 = { id: 102, name: "Bob" }
 
 const formatter = new FixedLengthFormatter(schema)
 
-const record = formatter.format({
-  id: 123,
-  name: "Alice"
-})
+const line1 = formatter.format(user01)
+const line2 = formatter.format(user02)
 ```
 
 The default padding character is a space and the default record terminator is `\n`.
@@ -441,6 +538,36 @@ const formatter = new FixedLengthFormatter(
   "0",
   "\r\n"
 )
+```
+
+### `FixedLengthFormatter` combines with `FileWriter`
+
+```ts
+import { createFileWriter, FixedLengthAttributes, FixedLengthFormatter } from "export-kit"
+
+const schema: FixedLengthAttributes = {
+  id: { length: 5 },
+  name: { length: 10 }
+}
+
+const user01 = { id: 101, name: "John" }
+const user02 = { id: 102, name: "Bob" }
+
+const formatter = new CSVFormatter(schema, ",")
+
+const writer = createFileWriter("./output", "data.txt")
+
+writer.write(formatter.format(user01))
+writer.write(formatter.format(user02))
+
+writer.end()
+```
+
+Output:
+
+```
+  101      John
+  102       Bob
 ```
 
 ---
@@ -519,6 +646,70 @@ pad
 toFixedLength
 toString
 ```
+
+
+---
+
+## Export Pipeline
+
+The formatting and writing APIs can be combined to build streaming export pipelines.
+
+For example:
+
+```ts
+import { createLogWriter, CSVFormatter } from "export-kit"
+
+const schema = {
+  id: {},
+  name: {},
+  email: {}
+}
+
+const formatter = new CSVFormatter(schema, ",")
+
+const writer = createFileWriter("./output", "users.csv")
+
+const users = [
+  {
+    id: 1,
+    name: "John",
+    email: "john@example.com"
+  },
+  {
+    id: 2,
+    name: "Mary",
+    email: "mary@example.com"
+  }
+]
+
+for (const user of users) {
+  writer.write(formatter.format(user))
+}
+
+writer.end()
+```
+
+Conceptually:
+
+```text
+Domain Objects
+      │
+      ▼
+   Formatter
+      │
+      ▼
+Formatted Records
+      │
+      ▼
+     Writer
+      │
+      ▼
+     File
+```
+
+This separation allows formatting logic to remain independent from file I/O.
+
+---
 
 ## Ecosystem Integration
 
@@ -615,20 +806,6 @@ MIT
 # export-kit
 
 A lightweight TypeScript utility library for generating CSV and fixed-length text files, writing formatted records to streams, and handling common date/time formatting tasks.
-
-## Features
-
-* Write text to files using Node.js streams
-* Automatically create output directories
-* Append to files by default
-* Format objects as CSV
-* Properly escape CSV values containing separators, quotes, or line breaks
-* Format objects as fixed-length records
-* Customize field formatting with `getString`
-* Reusable `CSVFormatter` and `FixedLengthFormatter`
-* Generate date and time strings for file names and batch processing
-* Calculate dates with day offsets
-* Keep file-writing and formatting concerns separate
 
 ## Installation
 
@@ -1070,78 +1247,6 @@ toString({ id: 1, name: "John" })
 ```
 
 This is useful when a value may already be a string or may need a simple object representation.
-
----
-
-# Export Pipeline
-
-The formatting and writing APIs can be combined to build streaming export pipelines.
-
-For example:
-
-```ts
-import {
-  createLogWriter,
-  CSVFormatter
-} from "export-kit"
-
-const formatter = new CSVFormatter(
-  {
-    id: {},
-    name: {},
-    email: {}
-  },
-  ","
-)
-
-const writer = createLogWriter(
-  "./output",
-  "users.csv",
-  undefined,
-  ""
-)
-
-const users = [
-  {
-    id: 1,
-    name: "John",
-    email: "john@example.com"
-  },
-  {
-    id: 2,
-    name: "Mary",
-    email: "mary@example.com"
-  }
-]
-
-for (const user of users) {
-  writer.write(formatter.format(user))
-}
-
-writer.end()
-```
-
-Conceptually:
-
-```text
-Domain Objects
-      │
-      ▼
-   Formatter
-      │
-      ▼
-Formatted Records
-      │
-      ▼
-     Writer
-      │
-      ▼
-     File
-```
-
-This separation allows formatting logic to remain independent from file I/O.
-
----
 
 # API Summary
 
@@ -1794,32 +1899,6 @@ The same design is used by both CSV and fixed-length formatting:
        ▼                 ▼
     String Record     String Record
 ```
-
----
-
-# Typical Export Pipeline
-
-The utilities can be combined to create streaming export jobs.
-
-```ts
-const formatter = new CSVFormatter(
-  attributes,
-  ",",
-)
-
-const writer = new LogWriter(
-  "users.csv",
-  "./output",
-)
-
-for (const user of users) {
-  writer.write(formatter.format(user))
-}
-
-writer.end()
-```
-
-This approach allows records to be formatted and written incrementally instead of constructing the entire output file in memory.
 
 ---
 

@@ -63,6 +63,9 @@ export class LogWriter {
     this.writer.end(cb)
   }
 }
+export function createFileWriter(dir: string, filename: string, opts?: BufferEncoding | StreamOptions): FileWriter {
+  return new FileWriter(createWriteStream(dir, filename, opts))
+}
 // tslint:disable-next-line:max-classes-per-file
 export class FileWriter {
   constructor(protected writer: WriteStream) {
