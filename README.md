@@ -73,6 +73,22 @@ String/data
 
 This makes the formatting functions useful independently of the file-writing layer.
 
+```text
+Formatting
+  ├── CSV
+  └── Fixed Length
+
+Writing
+  ├── FileWriter
+  └── LogWriter
+
+Date utilities
+  ├── dateToString
+  ├── timeToString
+  ├── addDays
+  └── getPrefix
+```
+
 ---
 
 ## File Writing
@@ -132,7 +148,7 @@ writer.end()
 The default suffix is `\n`.
 
 ```ts
-import { LogWriter } from "export-kit"
+import { createLogWriter } from "export-kit"
 
 const writer = createLogWriter("./output", "application.log")
 
@@ -196,7 +212,7 @@ interface FixedLengthAttributes {
 ### Architecture
 
 ```text
-                      Object
+                  Business Object
                          │
          ┌───────────────┴───────────────┐
          │                               │
@@ -225,6 +241,23 @@ This separation keeps export logic independent from file I/O.
 ---
 
 ## CSV Formatting
+
+```text
+   User
+     │
+     ▼
+CSVFormatter
+     │
+     ▼
+ CSV Text
+```
+
+Supports:
+
+- Configurable separators
+- Automatic escaping
+- ISO date formatting
+- Custom field formatting
 
 ### `toCSV`
 CSV output is controlled by an attribute schema. The schema also determines the column order.
@@ -260,7 +293,7 @@ Output:
 Each attribute can define a `getString` function.
 
 ```ts
-import { Attributes, dateToString, toCSV } from "export-kit"
+import { Attributes, toCSV } from "export-kit"
 
 const schema: Attributes = {
   id: {},
@@ -314,7 +347,7 @@ Result:
 Another example:
 
 ```ts
-import { Attributes, dateToString, toCSV } from "export-kit"
+import { Attributes, toCSV } from "export-kit"
 
 const schema: Attributes = {
   id: {},
@@ -326,7 +359,7 @@ const schema: Attributes = {
 }
 
 const user = {
-  id: 100,
+  id: 101,
   name: 'John "Smith"',
   birthday: new Date(2006, 8, 18)
 }
@@ -364,6 +397,13 @@ console.log(formatter.format(user02))
 ```
 
 By default, each formatted record ends with `\n`.
+
+Output:
+
+```text
+101,John
+102,Bob
+```
 
 A custom record terminator can be supplied:
 
@@ -413,6 +453,22 @@ Output:
 ## Fixed-Length Formatting
 
 The library can generate fixed-length records using a schema that defines the length of every field.
+
+```text
+       User
+         │
+         ▼
+FixedLengthFormatter
+         │
+         ▼
+ Fixed-Length Text
+```
+
+Supports:
+
+- Configurable field widths
+- Automatic padding
+- Custom formatting
 
 ## `toFixedLength`
 
@@ -525,12 +581,19 @@ const line2 = formatter.format(user02)
 
 The default padding character is a space and the default record terminator is `\n`.
 
+Output:
+
+```
+  101      John
+  102       Bob
+```
+
 Custom values can be supplied:
 
 ```ts
 const schema: FixedLengthAttributes = {
-  id: { length: 8 },
-  name: { length: 20 }
+  id: { length: 5 },
+  name: { length: 10 }
 }
 
 const formatter = new FixedLengthFormatter(
@@ -671,14 +734,14 @@ const writer = createFileWriter("./output", "users.csv")
 
 const users = [
   {
-    id: 1,
+    id: 101,
     name: "John",
     email: "john@example.com"
   },
   {
-    id: 2,
-    name: "Mary",
-    email: "mary@example.com"
+    id: 102,
+    name: "Bob",
+    email: "bob@example.com"
   }
 ]
 
@@ -689,25 +752,54 @@ for (const user of users) {
 writer.end()
 ```
 
+Output:
+
+```
+101,John,john@example.com
+102,Bob,bob@example.com
+```
+
 Conceptually:
 
 ```text
 Domain Objects
       │
       ▼
-   Formatter
+  Formatter
       │
       ▼
 Formatted Records
       │
       ▼
-     Writer
+    Writer
       │
       ▼
      File
 ```
 
 This separation allows formatting logic to remain independent from file I/O.
+
+---
+
+## API Summary
+
+| API                    | Purpose                                    |
+| ---------------------- | ------------------------------------------ |
+| `createWriteStream`    | Create a writable file stream              |
+| `createLogWriter`      | Create a line-oriented writer              |
+| `LogWriter`            | Write strings with a suffix                |
+| `FileWriter`           | Lightweight `WriteStream` wrapper          |
+| `toCSV`                | Convert an object to CSV                   |
+| `escapeCSV`            | Escape a CSV value                         |
+| `CSVFormatter`         | Reusable CSV formatter                     |
+| `pad`                  | Pad or truncate a string                   |
+| `toFixedLength`        | Convert an object to a fixed-length record |
+| `FixedLengthFormatter` | Reusable fixed-length formatter            |
+| `dateToString`         | Format a date                              |
+| `timeToString`         | Format a time                              |
+| `addDays`              | Add or subtract days                       |
+| `getPrefix`            | Generate date-based prefixes               |
+| `toString`             | Convert a value to a string                |
 
 ---
 
@@ -1247,26 +1339,6 @@ toString({ id: 1, name: "John" })
 ```
 
 This is useful when a value may already be a string or may need a simple object representation.
-
-# API Summary
-
-| API                    | Purpose                                    |
-| ---------------------- | ------------------------------------------ |
-| `createWriteStream`    | Create a writable file stream              |
-| `createLogWriter`      | Create a line-oriented writer              |
-| `LogWriter`            | Write strings with a suffix                |
-| `FileWriter`           | Lightweight `WriteStream` wrapper          |
-| `toCSV`                | Convert an object to CSV                   |
-| `escapeCSV`            | Escape a CSV value                         |
-| `CSVFormatter`         | Reusable CSV formatter                     |
-| `pad`                  | Pad or truncate a string                   |
-| `toFixedLength`        | Convert an object to a fixed-length record |
-| `FixedLengthFormatter` | Reusable fixed-length formatter            |
-| `dateToString`         | Format a date                              |
-| `timeToString`         | Format a time                              |
-| `addDays`              | Add or subtract days                       |
-| `getPrefix`            | Generate date-based prefixes               |
-| `toString`             | Convert a value to a string                |
 
 ## Design
 
