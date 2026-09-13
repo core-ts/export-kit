@@ -263,9 +263,9 @@ Supports:
 CSV output is controlled by an attribute schema. The schema also determines the column order.
 
 ```ts
-import { toCSV } from "export-kit"
+import { Attributes, toCSV } from "export-kit"
 
-const schema = {
+const schema: Attributes = {
   id: {},
   name: {},
   email: {}
@@ -310,9 +310,9 @@ const user = {
   birthday: new Date(2006, 8, 18)
 }
 
-const csv = toCSV(user, ",", schema)
+const result = toCSV(user, ",", schema)
 
-console.log(csv)
+console.log(result)
 ```
 
 Output:
@@ -364,9 +364,9 @@ const user = {
   birthday: new Date(2006, 8, 18)
 }
 
-const csv = toCSV(user, ",", schema)
+const result = toCSV(user, ",", schema)
 
-console.log(csv)
+console.log(result)
 ```
 
 Output:
@@ -382,7 +382,7 @@ Output:
 ```ts
 import { Attributes, CSVFormatter } from "export-kit"
 
-const schema = {
+const schema: Attributes = {
   id: {},
   name: {}
 }
@@ -425,7 +425,7 @@ const formatter = new CSVFormatter(
 ```ts
 import { Attributes, createFileWriter, CSVFormatter } from "export-kit"
 
-const schema = {
+const schema: Attributes = {
   id: {},
   name: {}
 }
@@ -524,16 +524,16 @@ Therefore, field lengths should be chosen carefully when generating files consum
 As with CSV formatting, attributes can provide `getString`.
 
 ```ts
-import { FixedLengthAttributes, dateToString, toFixedLength } from "export-kit"
+import { FixedLengthAttributes, toFixedLength } from "export-kit"
 
 const schema: FixedLengthAttributes = {
   id: {
-    length: 5
+    length: 5,
     getString: (value: number) => value.toString()
   },
   name: {
     length: 10
-  }
+  },
   birthday: {
     length: 10,
     getString: (value: Date) =>
@@ -616,7 +616,7 @@ const schema: FixedLengthAttributes = {
 const user01 = { id: 101, name: "John" }
 const user02 = { id: 102, name: "Bob" }
 
-const formatter = new CSVFormatter(schema, ",")
+const formatter = new FixedLengthFormatter(schema, ",")
 
 const writer = createFileWriter("./output", "data.txt")
 
@@ -632,6 +632,74 @@ Output:
   101      John
   102       Bob
 ```
+
+---
+
+## Export Pipeline
+
+The formatting and writing APIs can be combined to build streaming export pipelines.
+
+For example:
+
+```ts
+import { Attributes, createFileWriter, CSVFormatter } from "export-kit"
+
+const schema: Attributes = {
+  id: {},
+  name: {},
+  email: {}
+}
+
+const formatter = new CSVFormatter(schema, ",")
+
+const writer = createFileWriter("./output", "users.csv")
+
+const users = [
+  {
+    id: 101,
+    name: "John",
+    email: "john@example.com"
+  },
+  {
+    id: 102,
+    name: "Bob",
+    email: "bob@example.com"
+  }
+]
+
+for (const user of users) {
+  writer.write(formatter.format(user))
+}
+
+writer.end()
+```
+
+Output:
+
+```
+101,John,john@example.com
+102,Bob,bob@example.com
+```
+
+Conceptually:
+
+```text
+Domain Objects
+      │
+      ▼
+  Formatter
+      │
+      ▼
+Formatted Records
+      │
+      ▼
+    Writer
+      │
+      ▼
+     File
+```
+
+This separation allows formatting logic to remain independent from file I/O.
 
 ---
 
@@ -709,75 +777,6 @@ pad
 toFixedLength
 toString
 ```
-
-
----
-
-## Export Pipeline
-
-The formatting and writing APIs can be combined to build streaming export pipelines.
-
-For example:
-
-```ts
-import { createLogWriter, CSVFormatter } from "export-kit"
-
-const schema = {
-  id: {},
-  name: {},
-  email: {}
-}
-
-const formatter = new CSVFormatter(schema, ",")
-
-const writer = createFileWriter("./output", "users.csv")
-
-const users = [
-  {
-    id: 101,
-    name: "John",
-    email: "john@example.com"
-  },
-  {
-    id: 102,
-    name: "Bob",
-    email: "bob@example.com"
-  }
-]
-
-for (const user of users) {
-  writer.write(formatter.format(user))
-}
-
-writer.end()
-```
-
-Output:
-
-```
-101,John,john@example.com
-102,Bob,bob@example.com
-```
-
-Conceptually:
-
-```text
-Domain Objects
-      │
-      ▼
-  Formatter
-      │
-      ▼
-Formatted Records
-      │
-      ▼
-    Writer
-      │
-      ▼
-     File
-```
-
-This separation allows formatting logic to remain independent from file I/O.
 
 ---
 
