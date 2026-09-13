@@ -164,20 +164,6 @@ Application started
 Application stopped
 ```
 
-A custom suffix can be supplied:
-
-```ts
-const writer = createLogWriter(
-  "./output",
-  "data.txt",
-  undefined,
-  "\r\n"
-)
-
-writer.write("Application started")
-writer.write("Application stopped")
-```
-
 ---
 
 ## Types
@@ -405,21 +391,6 @@ Output:
 102,Bob
 ```
 
-A custom record terminator can be supplied:
-
-```ts
-const schema: Attributes = {
-  id: {},
-  name: {}
-}
-
-const formatter = new CSVFormatter(
-  schema,
-  ",",
-  "\r\n"
-)
-```
-
 ### `CSVFormatter` combines with `FileWriter`
 
 ```ts
@@ -496,29 +467,6 @@ Output:
 ```
 Fields are left-padded using the configured padding character.
 
-### Padding
-
-The `pad()` utility performs left padding:
-
-```ts
-import { pad } from "export-kit"
-
-pad("123", 5, "0")
-// "00123"
-
-pad("ABC", 6, " ")
-// "   ABC"
-```
-
-When a value is longer than the requested length, it is truncated:
-
-```ts
-pad("ABCDEFG", 5, " ")
-// "ABCDE"
-```
-
-Therefore, field lengths should be chosen carefully when generating files consumed by external systems.
-
 ### Custom field formatting
 
 As with CSV formatting, attributes can provide `getString`.
@@ -586,21 +534,6 @@ Output:
 ```
   101      John
   102       Bob
-```
-
-Custom values can be supplied:
-
-```ts
-const schema: FixedLengthAttributes = {
-  id: { length: 5 },
-  name: { length: 10 }
-}
-
-const formatter = new FixedLengthFormatter(
-  schema,
-  "0",
-  "\r\n"
-)
 ```
 
 ### `FixedLengthFormatter` combines with `FileWriter`
@@ -760,45 +693,20 @@ const previous = getPrefix("orders_", new Date(), -1)
 // orders_20260817
 ```
 
-## Utility Functions
-
-The following functions are exported:
-
-```ts
-getPrefix
-dateToString
-timeToString
-addDays
-mkdirSync
-createWriteStream
-toCSV
-escapeCSV
-pad
-toFixedLength
-toString
-```
-
 ---
 
 ## API Summary
 
 | API                    | Purpose                                    |
 | ---------------------- | ------------------------------------------ |
-| `createWriteStream`    | Create a writable file stream              |
-| `createLogWriter`      | Create a line-oriented writer              |
 | `LogWriter`            | Write strings with a suffix                |
 | `FileWriter`           | Lightweight `WriteStream` wrapper          |
 | `toCSV`                | Convert an object to CSV                   |
-| `escapeCSV`            | Escape a CSV value                         |
 | `CSVFormatter`         | Reusable CSV formatter                     |
-| `pad`                  | Pad or truncate a string                   |
 | `toFixedLength`        | Convert an object to a fixed-length record |
 | `FixedLengthFormatter` | Reusable fixed-length formatter            |
 | `dateToString`         | Format a date                              |
 | `timeToString`         | Format a time                              |
-| `addDays`              | Add or subtract days                       |
-| `getPrefix`            | Generate date-based prefixes               |
-| `toString`             | Convert a value to a string                |
 
 ---
 
