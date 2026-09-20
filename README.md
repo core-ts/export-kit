@@ -166,7 +166,7 @@ Application stopped
 
 ---
 
-## Types
+## Schema
 
 ### `Attribute`
 
@@ -523,8 +523,8 @@ const user02 = { id: 102, name: "Bob" }
 
 const formatter = new FixedLengthFormatter(schema)
 
-const line1 = formatter.format(user01)
-const line2 = formatter.format(user02)
+console.log(formatter.format(user01))
+console.log(formatter.format(user02))
 ```
 
 The default padding character is a space and the default record terminator is `\n`.
