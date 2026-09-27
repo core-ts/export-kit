@@ -210,41 +210,22 @@ export function getPrefix(v: string, date: Date, offset?: number, separator?: st
     return v + dateToString(date, separator)
   }
 }
+export function pad2(n: number): string {
+  return n < 10 ? "0" + n : n.toString()
+}
 export function dateToString(date: Date, separator?: string): string {
   const year = date.getFullYear()
-  let month: number | string = date.getMonth() + 1
-  let dt: number | string = date.getDate()
-
-  if (dt < 10) {
-    dt = "0" + dt.toString()
-  }
-  if (month < 10) {
-    month = "0" + month
-  }
-  if (separator !== undefined) {
-    return "" + year + separator + month + separator + dt
-  } else {
-    return "" + year + month + dt
-  }
+  const month = pad2(date.getMonth() + 1)
+  const day = pad2(date.getDate())
+  const s = separator != null ?  separator : ""
+  return `${year}${s}${month}${s}${day}`
 }
-export function timeToString(date: Date, separator?: string): string {
-  let hh: number | string = date.getHours()
-  let mm: number | string = date.getMinutes()
-  let ss: number | string = date.getSeconds()
-  if (hh < 10) {
-    hh = "0" + hh.toString()
-  }
-  if (ss < 10) {
-    ss = "0" + ss.toString()
-  }
-  if (mm < 10) {
-    mm = "0" + mm
-  }
-  if (separator !== undefined) {
-    return "" + hh + separator + mm + separator + ss
-  } else {
-    return "" + hh + mm + ss
-  }
+export function timeToString(d2: Date, separator?: string): string {
+  const hours = pad2(d2.getHours())
+  const minutes = pad2(d2.getMinutes())
+  const seconds = pad2(d2.getSeconds())
+  const s = separator != null ?  separator : ""
+  return `${hours}${s}${minutes}${s}${seconds}`
 }
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date)
